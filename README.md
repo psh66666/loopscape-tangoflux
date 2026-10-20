@@ -1,0 +1,95 @@
+# Loopscape：可循环环境声景生成
+
+基于 [TangoFlux（ICLR 2026）](https://proceedings.iclr.cc/paper_files/paper/2026/hash/f475c4cf43826411ae61c94bab360a0d-Abstract-Conference.html) 的课程研究代码库。目标是微调文本到环境音效模型，使雨、风、水流等连续背景声在首尾拼接并重复播放时更自然。本仓库包含普通 LoRA 微调、循环上下文模块、边界损失、参数量匹配的控制组、数据处理、生成和评测入口。
+
+**当前状态：代码与配置已建立；尚未租用 GPU，也没有训练结果或质量结论。** 用户将在租用的服务器上运行实验。本地仅做 Python 语法与静态检查。
+
+## 研究问题
+
+TangoFlux 本身使用 flow matching 预测音频潜变量。改进版在加噪潜变量上通过 circular padding 交换首尾局部上下文，同时对预测的干净潜变量施加边界连续性损失。比较组使用相同的主模型检查点、数据、LoRA 配置、随机种子、更新步数和采样提示。`plain_adapter` 与改进版有相同的卷积参数量，但不跨接缝交换上下文。方法细节见[设计规格](docs/superpowers/specs/2026-10-20-loopscape-design.md)。
+
+## 仓库结构
+
+| 路径 | 用途 |
+|---|---|
+| `third_party/TangoFlux/` | 固定到上游提交的源码快照与原许可证 |
+| `loopscape/prepare.py` | 经许可审计的环境录音清单、循环片段构造与数据切分 |
+| `loopscape/probe.py` | 已知循环样本的 VAE 编码—解码回环诊断 |
+| `loopscape/train.py` | 单卡 LoRA 基线、循环改进与消融训练 |
+| `loopscape/generate.py` | 相同提示和种子的 WAV 生成；可选推理后去点击或双侧交叉淡化控制 |
+| `loopscape/evaluate.py` | 接缝、响度、CLAP 和 FAD 评测 |
+| `configs/` | 固定训练配置及演示提示 |
+| `docs/` | 数据、上游来源、租机要求及实验记录 |
+
+## 安装（Linux + NVIDIA CUDA）
+
+建议 Python 3.11、PyTorch 2.4 系列与兼容的 CUDA 驱动。命令在仓库根目录执行：
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e third_party/TangoFlux
+python -m pip install -e '.[quality]'
+```
+
+首次使用会从 Hugging Face 下载固定 revision 的 TangoFlux、VAE 和 FLAN-T5-Large 权重。具体版本见[上游来源](docs/upstream.md)。训练前确认各模型和数据许可证允许你的用途；本项目限非商业研究。
+
+## 数据准备
+
+将**已人工审查训练许可**的原始录音及文字描述写入 `data/raw/manifest.jsonl`，每行示例：
+
+```json
+{"source_id":"freesound-123456","group_id":"uploader-name","source_url":"https://freesound.org/s/123456/","author":"uploader-name","license":"cc-by-4.0","ai_training_allowed":true,"permission_checked_at":"2026-10-20","path":"data/raw/123456.wav","caption":"Steady rain falling on a roof"}
+```
+
+示例只展示清单格式，不代表该声音已获准用于训练。`group_id` 建议使用上传者或同一原始录音的共同标识，以免同源片段跨训练/测试集。仅接受明确标记许可与检查日期的条目。原录音至少需 10.5 秒；预处理从连续源录音中构造 10 秒循环片段，并输出接受/拒绝清单：
+
+```bash
+python -m loopscape.prepare --input data/raw/manifest.jsonl --output-dir data/processed --duration 10 --overlap 0.5
+```
+
+正式训练前先人工听取样本、核对描述和许可证，再检查 VAE 是否保持接缝：
+
+```bash
+python -m loopscape.probe --config configs/baseline.yaml --audio data/processed/audio/你的样本.wav --output-dir outputs/vae_probe
+```
+
+详见[数据规范](docs/data.md)。
+
+## 显存/速度探针和训练
+
+先在租用机器上运行两步，记录日志中的峰值显存和耗时；这是真正租机规格和总成本估算的依据：
+
+```bash
+python -m loopscape.train --config configs/baseline.yaml --max-steps 2 --output-dir runs/probe_baseline
+python -m loopscape.train --config configs/circular.yaml --max-steps 2 --output-dir runs/probe_circular
+```
+
+诊断通过后，分别训练相同的 1000 个优化器更新步：
+
+```bash
+python -m loopscape.train --config configs/baseline.yaml
+python -m loopscape.train --config configs/circular.yaml
+```
+
+中断后加 `--resume`，从 `run.json`、`adapter.safetensors` 和 `state.pt` 恢复。训练日志 `train.jsonl` 记录 loss、耗时、峰值显存；检查点保存上游版本、配置和数据清单 SHA-256。基线和改进均实际更新 LoRA 参数；改进版另更新循环模块。消融命令见[实验矩阵](docs/experiments.md)。
+
+## 生成与评测
+
+`configs/eval_prompts.jsonl` 只有 8 个演示提示；正式报告须建立更大的固定、未参与调参的提示集。下面的命令在所有组使用同一提示、种子和采样设置：
+
+```bash
+python -m loopscape.generate --config configs/baseline.yaml --run-dir runs/baseline --output-dir outputs/baseline --prompts configs/eval_prompts.jsonl --seed 1200
+python -m loopscape.generate --config configs/circular.yaml --run-dir runs/circular --output-dir outputs/circular --prompts configs/eval_prompts.jsonl --seed 1200
+python -m loopscape.generate --config configs/baseline.yaml --run-dir runs/baseline --output-dir outputs/baseline_declick --prompts configs/eval_prompts.jsonl --seed 1200 --declick
+python -m loopscape.generate --config configs/baseline.yaml --run-dir runs/baseline --output-dir outputs/baseline_crossfade --prompts configs/eval_prompts.jsonl --seed 1200 --crossfade
+python -m loopscape.evaluate --generated-dir outputs/circular --compare-dir outputs/baseline
+python -m loopscape.evaluate --generated-dir outputs/circular --reference-manifest data/processed/manifest.jsonl --quality
+```
+
+`--declick` 是轻量去点击，`--crossfade` 在首尾两侧做固定长度的交叉淡化；它们都是推理后处理，不能视为训练改进。自动指标必须结合双循环盲听与质量/响度检查；不能只报告首尾一个采样点的跳变。[实验规范](docs/experiments.md)列出所需对照与失败判据。
+
+## 许可和来源
+
+上游 TangoFlux 源码、模型及训练数据有各自限制，详见[上游来源](docs/upstream.md)及 `third_party/TangoFlux/` 中的原始许可证。WavCaps 仅允许学术用途，Freesound 的逐条 Creative Commons 许可及上传者生成式 AI 训练偏好必须另行检查。仓库不包含训练音频、模型权重或实验结果。

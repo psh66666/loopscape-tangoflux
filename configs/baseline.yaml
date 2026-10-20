@@ -1,0 +1,18 @@
+model:
+  repo_id: declare-lab/TangoFlux
+  revision: 367005e963cb3a9fb2e03a46104d7de23e34ceea
+  duration_s: 10.0
+train:
+  mode: baseline
+  manifest: data/processed/manifest.jsonl
+  output_dir: runs/baseline
+  seed: 42
+  batch_size: 1
+  grad_accum: 4
+  max_steps: 1000
+  learning_rate: 0.0001
+  lora_rank: 8
+  lora_alpha: 16
+  boundary_weight: 0.0
+  precision: bf16
+  save_every: 200

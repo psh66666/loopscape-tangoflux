@@ -1,0 +1,17 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+data/raw/
+data/processed/
+runs/
+outputs/
+*.safetensors
+*.ckpt
+*.pt
+*.wav
+*.flac
+*.mp3
+*.jsonl.tmp
