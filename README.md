@@ -14,6 +14,7 @@ TangoFlux 本身使用 flow matching 预测音频潜变量。改进版在加噪�
 |---|---|
 | `third_party/TangoFlux/` | 固定到上游提交的源码快照与原许可证 |
 | `loopscape/prepare.py` | 经许可审计的环境录音清单、循环片段构造与数据切分 |
+| `loopscape/curate_wavcaps.py` | 从 WavCaps Freesound 元数据生成候选与逐条许可核查表 |
 | `loopscape/probe.py` | 已知循环样本的 VAE 编码—解码回环诊断 |
 | `loopscape/train.py` | 单卡 LoRA 基线、循环改进与消融训练 |
 | `loopscape/generate.py` | 相同提示和种子的 WAV 生成；可选推理后去点击或双侧交叉淡化控制 |
@@ -37,13 +38,28 @@ python -m pip install -e '.[quality]'
 
 ## 数据准备
 
-将**已人工审查训练许可**的原始录音及文字描述写入 `data/raw/manifest.jsonl`，每行示例：
+可先从 [WavCaps 官方仓库](https://github.com/XinhaoMei/WavCaps)取得 `data/json_files/FreeSound/fsd_final.json`，按其说明取得本地音频。候选工具依据描述和标签挑出时长至少 10.5 秒的环境录音，并按 Freesound ID 匹配本地 `123456.wav` 或 `123456__*.wav` 等文件。它不会推断许可：
+
+```bash
+python -m loopscape.curate_wavcaps --metadata data/raw/fsd_final.json --audio-root data/raw/wavcaps_freesound --output-dir data/curated
+cp data/curated/review_template.csv data/curated/review.csv
+```
+
+逐条查看 Freesound 原页面、许可条款和上传者的生成式 AI 训练偏好后，在 `review.csv` 填写 `license`、`ai_training_allowed`、`permission_checked_at`（ISO 日期）；来源链接、作者和描述也要核对。只会将明确填 `true`、许可证在项目允许列表且本地音频存在的行导入：
+
+```bash
+python -m loopscape.curate_wavcaps --metadata data/raw/fsd_final.json --audio-root data/raw/wavcaps_freesound --output-dir data/curated --review-csv data/curated/review.csv
+python -m loopscape.prepare --input data/curated/approved_manifest.jsonl --output-dir data/processed --duration 10 --overlap 0.5
+```
+
+也可自行将**已人工审查训练许可**的原始录音及文字描述写入 `data/raw/manifest.jsonl`，每行示例：
+
 
 ```json
 {"source_id":"freesound-123456","group_id":"uploader-name","source_url":"https://freesound.org/s/123456/","author":"uploader-name","license":"cc-by-4.0","ai_training_allowed":true,"permission_checked_at":"2026-10-20","path":"data/raw/123456.wav","caption":"Steady rain falling on a roof"}
 ```
 
-示例只展示清单格式，不代表该声音已获准用于训练。`group_id` 建议使用上传者或同一原始录音的共同标识，以免同源片段跨训练/测试集。仅接受明确标记许可与检查日期的条目。原录音至少需 10.5 秒；预处理从连续源录音中构造 10 秒循环片段，并输出接受/拒绝清单：
+示例只展示清单格式，不代表该声音已获准用于训练。`group_id` 建议使用上传者或同一原始录音的共同标识，以免同源片段跨训练/测试集。仅接受明确标记许可与检查日期的条目。原录音至少需 10.5 秒；预处理从连续源录音中构造 10 秒循环片段，并输出接受/拒绝清单。自建清单对应命令：
 
 ```bash
 python -m loopscape.prepare --input data/raw/manifest.jsonl --output-dir data/processed --duration 10 --overlap 0.5
