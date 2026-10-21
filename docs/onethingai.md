@@ -16,8 +16,12 @@ python --version
 ```bash
 conda create -y -p /root/miniconda3/envs/loopscape-py311 python=3.11 pip
 source /root/onethingai-fs/projects/loopscape-tangoflux/scripts/activate-onethingai.sh
-python -m pip install --no-cache-dir --index-url https://mirrors.aliyun.com/pypi/simple -e third_party/TangoFlux -e .
-python -m pip install --no-cache-dir --index-url https://mirrors.aliyun.com/pypi/simple -e '.[quality]'
+python -m pip install uv
+uv pip install --system-certs --python /root/miniconda3/envs/loopscape-py311/bin/python -r requirements-training.txt
+uv pip install --system-certs --python /root/miniconda3/envs/loopscape-py311/bin/python --no-deps -e third_party/TangoFlux -e .
+uv pip install --system-certs --python /root/miniconda3/envs/loopscape-py311/bin/python -r requirements-quality.txt
 ```
+
+实例的阿里云 PyPI 镜像未提供上游演示界面的 `gradio`，因此按仓库列出的训练依赖安装；`uv --system-certs` 用于适配实例代理的系统证书。上述安装从 PyPI 官方索引解析固定版本。
 
 正式训练前依照 [README](../README.md) 放入已审查的数据，先运行 VAE 回环诊断和两步显存探针。4090 有 24 GiB 显存，但本项目尚无实测峰值，不能据此保证完整训练不会 OOM。

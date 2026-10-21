@@ -30,9 +30,13 @@ TangoFlux 本身使用 flow matching 预测音频潜变量。改进版在加噪�
 python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -e third_party/TangoFlux
-python -m pip install -e '.[quality]'
+python -m pip install uv
+uv pip install -r requirements-training.txt
+uv pip install --no-deps -e third_party/TangoFlux -e .
+uv pip install -r requirements-quality.txt
 ```
+
+训练所需依赖独立列出，避免安装上游演示界面的 `gradio` 等非训练组件。上游源码及其声明的版本保持原样。
 
 首次使用会从 Hugging Face 下载固定 revision 的 TangoFlux、VAE 和 FLAN-T5-Large 权重。具体版本见[上游来源](docs/upstream.md)。训练前确认各模型和数据许可证允许你的用途；本项目限非商业研究。
 
