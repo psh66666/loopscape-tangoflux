@@ -18,8 +18,8 @@ DEFAULT_KEYWORDS = (
 )
 REVIEW_COLUMNS = (
     "source_id", "source_url", "author", "caption", "duration_s",
-    "audio_path", "license", "ai_training_allowed", "permission_checked_at",
-    "reviewer_notes",
+    "audio_path", "license", "genai_preference", "permission_evidence_url",
+    "ai_training_allowed", "permission_checked_at", "reviewer_notes",
 )
 AUDIO_SUFFIXES = {".wav", ".flac", ".mp3", ".ogg", ".aif", ".aiff"}
 
@@ -110,6 +110,8 @@ def curate(
             "duration_s": str(duration),
             "audio_path": str(paths[0]) if len(paths) == 1 else "",
             "license": "",
+            "genai_preference": "",
+            "permission_evidence_url": "",
             "ai_training_allowed": "",
             "permission_checked_at": "",
             "reviewer_notes": "",
@@ -127,6 +129,10 @@ def curate(
             reason = "caption differs from current metadata"
         elif review.get("license", "").strip().lower() not in ALLOWED_LICENSES:
             reason = "license missing or outside project allowlist"
+        elif review.get("genai_preference", "").strip().lower() != "no_additional_preferences":
+            reason = "uploader Gen AI preference unverified or incompatible with current release plan"
+        elif not review.get("permission_evidence_url", "").strip().startswith("https://"):
+            reason = "HTTPS URL for permission evidence is missing"
         elif review.get("ai_training_allowed", "").strip().lower() != "true":
             reason = "AI training permission has not been affirmed"
         elif not review.get("permission_checked_at", "").strip():
@@ -155,6 +161,8 @@ def curate(
             "source_url": source_url,
             "author": candidate["author"],
             "license": review["license"].strip().lower(),
+            "genai_preference": review["genai_preference"].strip().lower(),
+            "permission_evidence_url": review["permission_evidence_url"].strip(),
             "ai_training_allowed": True,
             "permission_checked_at": review["permission_checked_at"].strip(),
             "path": str(selected_path.resolve()),

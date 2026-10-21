@@ -37,6 +37,11 @@ def prepare(input_path: Path, output_dir: Path, duration_s: float, overlap_s: fl
             reason = "AI training permission not recorded as allowed"
         elif str(item["license"]).lower() not in ALLOWED_LICENSES:
             reason = "license not in the reviewed allowlist"
+        elif "freesound.org" in str(item["source_url"]).lower() and (
+            item.get("genai_preference") != "no_additional_preferences"
+            or not str(item.get("permission_evidence_url", "")).startswith("https://")
+        ):
+            reason = "Freesound uploader Gen AI preference and evidence are required"
         if reason:
             rejected.append({"source_id": source_id, "reason": reason})
             continue
@@ -61,6 +66,8 @@ def prepare(input_path: Path, output_dir: Path, duration_s: float, overlap_s: fl
                 "source_url": item["source_url"],
                 "author": item["author"],
                 "license": item["license"],
+                "genai_preference": item.get("genai_preference"),
+                "permission_evidence_url": item.get("permission_evidence_url"),
                 "ai_training_allowed": True,
                 "permission_checked_at": item["permission_checked_at"],
                 "caption": item["caption"],

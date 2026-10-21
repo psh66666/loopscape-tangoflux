@@ -44,14 +44,14 @@ OneThingAI 实例的实际挂载路径、环境激活和重建步骤见[部署�
 
 ## 数据准备
 
-可先从 [WavCaps 官方仓库](https://github.com/XinhaoMei/WavCaps)取得 `data/json_files/FreeSound/fsd_final.json`，按其说明取得本地音频。候选工具依据描述和标签挑出时长至少 10.5 秒的环境录音，并按 Freesound ID 匹配本地 `123456.wav` 或 `123456__*.wav` 等文件。它不会推断许可：
+可先从 [WavCaps 官方数据集](https://huggingface.co/datasets/cvssp/WavCaps)取得 `json_files/FreeSound/fsd_final.json`，放在 `data/raw/`。已核对的文件 SHA-256 为 `4499ada1a7a76666695d880feb298f557efb3aa8af3b57fd9b713c75319ff53f`。候选工具依据描述和标签挑出时长至少 10.5 秒的环境录音，并按 Freesound ID 匹配本地 `123456.wav` 或 `123456__*.wav` 等文件。宽筛选约有 6.4 万条，不能逐条直接用于训练。`data/curated/review_shortlist.csv` 是从中选出的 120 条雨、风、流水、海浪元数据候选；它们尚未通过许可或听音审查。工具不会推断许可：
 
 ```bash
 python -m loopscape.curate_wavcaps --metadata data/raw/fsd_final.json --audio-root data/raw/wavcaps_freesound --output-dir data/curated
-cp data/curated/review_template.csv data/curated/review.csv
+cp data/curated/review_shortlist.csv data/curated/review.csv
 ```
 
-逐条查看 Freesound 原页面、许可条款和上传者的生成式 AI 训练偏好后，在 `review.csv` 填写 `license`、`ai_training_allowed`、`permission_checked_at`（ISO 日期）；来源链接、作者和描述也要核对。只会将明确填 `true`、许可证在项目允许列表且本地音频存在的行导入：
+逐条查看 Freesound 原页面、许可条款和上传者的生成式 AI 训练偏好后，在 `review.csv` 填写 `license`、`genai_preference`、`permission_evidence_url`、`ai_training_allowed`、`permission_checked_at`（ISO 日期）；来源链接、作者和描述也要核对。当前实验只接纳经证实为 `no_additional_preferences` 的上传者，且必须有可追溯的 HTTPS 核查证据。WavCaps 旧元数据不含这项偏好。若需批量获取，按 [Freesound 官方说明](https://freesound.org/help/faq/#i-want-to-download-large-amounts-of-sounds-from-freesound-to-train-an-artificial-intelligence-ai-model-can-i-do-that)申请 Data Packs，并使用其中的偏好字段过滤；不要把 WavCaps 的可下载性当作训练许可。只会将明确填 `true`、许可证在项目允许列表且本地音频存在的行导入：
 
 ```bash
 python -m loopscape.curate_wavcaps --metadata data/raw/fsd_final.json --audio-root data/raw/wavcaps_freesound --output-dir data/curated --review-csv data/curated/review.csv
@@ -62,7 +62,7 @@ python -m loopscape.prepare --input data/curated/approved_manifest.jsonl --outpu
 
 
 ```json
-{"source_id":"freesound-123456","group_id":"uploader-name","source_url":"https://freesound.org/s/123456/","author":"uploader-name","license":"cc-by-4.0","ai_training_allowed":true,"permission_checked_at":"2026-10-20","path":"data/raw/123456.wav","caption":"Steady rain falling on a roof"}
+{"source_id":"freesound-123456","group_id":"uploader-name","source_url":"https://freesound.org/s/123456/","author":"uploader-name","license":"cc-by-4.0","genai_preference":"no_additional_preferences","permission_evidence_url":"https://example.org/verified-permission-record-123456","ai_training_allowed":true,"permission_checked_at":"2026-10-21","path":"data/raw/123456.wav","caption":"Steady rain falling on a roof"}
 ```
 
 示例只展示清单格式，不代表该声音已获准用于训练。`group_id` 建议使用上传者或同一原始录音的共同标识，以免同源片段跨训练/测试集。仅接受明确标记许可与检查日期的条目。原录音至少需 10.5 秒；预处理从连续源录音中构造 10 秒循环片段，并输出接受/拒绝清单。自建清单对应命令：

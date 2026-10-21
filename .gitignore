@@ -6,6 +6,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 data/raw/
+data/curated/
 data/processed/
 runs/
 outputs/
