@@ -36,6 +36,8 @@ python -m pip install -e '.[quality]'
 
 首次使用会从 Hugging Face 下载固定 revision 的 TangoFlux、VAE 和 FLAN-T5-Large 权重。具体版本见[上游来源](docs/upstream.md)。训练前确认各模型和数据许可证允许你的用途；本项目限非商业研究。
 
+OneThingAI 实例的实际挂载路径、环境激活和重建步骤见[部署记录](docs/onethingai.md)。
+
 ## 数据准备
 
 可先从 [WavCaps 官方仓库](https://github.com/XinhaoMei/WavCaps)取得 `data/json_files/FreeSound/fsd_final.json`，按其说明取得本地音频。候选工具依据描述和标签挑出时长至少 10.5 秒的环境录音，并按 Freesound ID 匹配本地 `123456.wav` 或 `123456__*.wav` 等文件。它不会推断许可：
