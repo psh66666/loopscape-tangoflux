@@ -2,6 +2,8 @@
 
 2026-10-21 检查：实例配备 RTX 4090（24 GiB 显存）、96 GiB 系统内存，系统为 Ubuntu 22.04。已挂载 220 GiB 的云存储 `/root/onethingai-fs`。代码路径为 `/root/onethingai-fs/projects/loopscape-tangoflux`；Hugging Face、Torch 和通用模型缓存放在 `/root/onethingai-fs/cache/`。云存储适合保存代码、权重和训练输出，但小文件 I/O 较慢。[OneThingAI 云存储说明](https://docs.onethingai.com/a0d48/ba014/1de27)确认它跨实例保留，且超过免费额度会计费。
 
+TangoFlux 与 FLAN-T5-Large 的固定 revision 已预取到 Hugging Face 持久缓存，约占 6.8 GiB。当前实例已安装 Python 3.11、PyTorch 2.4.0、torchaudio 2.4.0 及 CLAP/FAD 评测依赖。训练数据尚待逐条许可审核后放入 `data/raw/`。
+
 Python 3.11 环境放在实例本地 `/root/miniconda3/envs/loopscape-py311` 以避免在云存储中写入大量小文件。**实例释放或更换后，环境可能需要重建；代码、缓存、数据和输出应留在云存储。**当前仓库的 `data/`、`runs/` 和 `outputs/` 位于云存储路径下，训练时不要把这些目录改到 `/tmp` 或容器临时层。
 
 登录实例后激活环境：
