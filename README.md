@@ -2,7 +2,7 @@
 
 基于 [TangoFlux（ICLR 2026）](https://proceedings.iclr.cc/paper_files/paper/2026/hash/f475c4cf43826411ae61c94bab360a0d-Abstract-Conference.html) 的课程研究代码库。目标是微调文本到环境音效模型，使雨、风、水流等连续背景声在首尾拼接并重复播放时更自然。本仓库包含普通 LoRA 微调、循环上下文模块、边界损失、参数量匹配的控制组、数据处理、生成和评测入口。
 
-**当前状态：已部署到 OneThingAI 的 RTX 4090 实例，并预取固定版本权重；尚无经许可审核的训练数据，因此没有开始训练，也没有实验结果。** 按用户约定，代码由用户运行测试；部署阶段只做语法与环境检查。
+**当前状态：已部署到 OneThingAI 的 RTX 4090 实例，并预取固定版本权重；正在持久盘获取 CC0 森林声景样本，尚未开始训练，也没有实验结果。** 按用户约定，代码由用户运行测试；部署阶段只做语法与环境检查。
 
 ## 研究问题
 
@@ -14,6 +14,7 @@ TangoFlux 本身使用 flow matching 预测音频潜变量。改进版在加噪�
 |---|---|
 | `third_party/TangoFlux/` | 固定到上游提交的源码快照与原许可证 |
 | `loopscape/prepare.py` | 经许可审计的环境录音清单、循环片段构造与数据切分 |
+| `scripts/download_sensing_forest_subset.py` | 从 Zenodo CC0 档案按字节范围提取可复现的森林录音子集 |
 | `loopscape/curate_wavcaps.py` | 从 WavCaps Freesound 元数据生成候选与逐条许可核查表 |
 | `loopscape/probe.py` | 已知循环样本的 VAE 编码—解码回环诊断 |
 | `loopscape/train.py` | 单卡 LoRA 基线、循环改进与消融训练 |
@@ -43,6 +44,17 @@ uv pip install -r requirements-quality.txt
 OneThingAI 实例的实际挂载路径、环境激活和重建步骤见[部署记录](docs/onethingai.md)。
 
 ## 数据准备
+
+无需逐位作者申请授权的起步数据可使用 [Sensing the Forest Natural Soundscape Dataset Part 2](https://zenodo.org/records/18911328)。发布方在档案和随附 README 中将录音标为 CC0。由于完整 ZIP 约 20.7 GB、当前实例下载速度有限，脚本从 ZIP 中按固定种子选 240 条录音，每条截取 10.5 秒，保存在实例**持久盘**的 `data/raw/sensing_forest/`；中断后重复执行会跳过已写入清单的文件：
+
+```bash
+python scripts/download_sensing_forest_subset.py --count 240 --workers 6 --output-dir data/raw/sensing_forest
+python -m loopscape.prepare --input data/raw/sensing_forest/manifest.jsonl --output-dir data/processed --duration 10 --overlap 0.5
+```
+
+脚本只读取档案的部分字节，因此不能核对**完整 ZIP** 的 MD5；来源、公开的 MD5、每条输出文件的 SHA-256 和提取区间均写入原始清单。Zenodo 附带的 README 单独核对 MD5。这个子集集中在一个英国林地，描述只有录制时段，不足以代表雨、河流等多种场景；正式训练前仍需听音、检查描述和排除异常片段。详情见[数据说明](docs/data.md)。
+
+另一条数据路线是 WavCaps Freesound 子集，需要逐条审核：
 
 可先从 [WavCaps 官方数据集](https://huggingface.co/datasets/cvssp/WavCaps)取得 `json_files/FreeSound/fsd_final.json`，放在 `data/raw/`。已核对的文件 SHA-256 为 `4499ada1a7a76666695d880feb298f557efb3aa8af3b57fd9b713c75319ff53f`。候选工具依据描述和标签挑出时长至少 10.5 秒的环境录音，并按 Freesound ID 匹配本地 `123456.wav` 或 `123456__*.wav` 等文件。宽筛选约有 6.4 万条，不能逐条直接用于训练。`data/curated/review_shortlist.csv` 是从中选出的 120 条雨、风、流水、海浪元数据候选；它们尚未通过许可或听音审查。工具不会推断许可：
 

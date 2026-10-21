@@ -1,5 +1,15 @@
 # 数据清单与审计
 
+## Zenodo CC0 森林声景子集
+
+[Sensing the Forest Natural Soundscape Dataset Part 2](https://zenodo.org/records/18911328) 是项目方发布的英国 Surrey 林地长录音档案。随档 `README.txt` 逐条列出 Freesound 原始声音链接，并标记为 Creative Commons 0；本次取得的 README MD5 为 `3e17209751cb59dbf10d2cadd78f00bb`，与发布页一致。完整 ZIP 的发布 MD5 为 `01feafa071d8dd2e5f1a60df362c6cc3`，大小为 20,698,813,016 字节。
+
+`scripts/download_sensing_forest_subset.py` 用 HTTP Range 读取 ZIP 目录和选中成员的开头部分，以种子 `20261021` 从 742 条匹配的五分钟 WAV 中选 240 条。每条从第 5 秒起保存 10.5 秒 WAV；清单记录 Zenodo 页面、Freesound 原声 ID、作者、录制日期、许可证据页、文件 SHA-256 和截取区间。只获取子集，**未核对完整 ZIP 的 MD5 或每个原始五分钟录音的 CRC**。中断后重跑会跳过已存在且写入清单的片段。保存路径在 OneThingAI 的持久盘内，数据不进入 Git。
+
+这批文件覆盖森林的不同时段，却都来自同一个地点与同一采集系统。自动描述仅标注森林和大致时段，不能臆测每条具体包含的鸟鸣、雨声或风声。它适合先做林地氛围的可循环生成实验；若要声称模型对其他环境泛化，需要补充场景不同且许可清晰的数据。正式训练前应随机听取声音，确认描述和音质，并排除人声、强瞬态、静音及设备故障。清单按录制日期分组，避免同一天的相近录音跨训练和测试集。
+
+## Freesound / WavCaps 候选
+
 环境录音并不自动构成可循环训练真值。优先选择稳定的雨、风、水流、机械底噪等连续声景，排除人声、旋律音乐、爆炸等强起止事件。候选可来自 [WavCaps Freesound 子集](https://github.com/XinhaoMei/WavCaps)；[freefield1010](https://arxiv.org/abs/1309.5275)适合声景筛查，但其标准片段为 10 秒，通常不足以满足本项目默认 10 秒加 0.5 秒重叠区的构造要求。
 
 `loopscape.curate_wavcaps` 读取 WavCaps 的 `fsd_final.json`，按描述和标签中的环境声音关键词、元数据时长筛选，并查找本地以 Freesound 数字 ID 命名的音频。默认关键词只是候选召回，不能替代实际听音与挑选。输出 `review_template.csv`、`approved_manifest.jsonl` 和 `review_rejected.jsonl`。第一次运行时批准清单为空；将模板复制为独立的 `review.csv` 后逐条核查并填写。后续运行通过 `--review-csv` 导入已核查条目。模板文件每次都会重建，因此不要直接在模板里保存审核结论。若音频命名不符合 ID 规则，可在审核 CSV 的 `audio_path` 填写实际路径。
